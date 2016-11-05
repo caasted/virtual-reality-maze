@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class Key : MonoBehaviour 
 {
-    //Create a reference to the KeyPoofPrefab and Door
+    //Create a reference to the Poof Prefab and Door
     public GameObject PoofReference;
     public GameObject DoorReference;
 
@@ -23,6 +23,7 @@ public class Key : MonoBehaviour
     private float _animated_lerp = 1.0f;
     private AudioSource _audio_source = null;
     private Material _material = null;
+    private float _click_start_time = 0.0f;
 
     [Header("State Blend Speeds")]
     public float lerp_idle = 0.0f;
@@ -81,46 +82,51 @@ public class Key : MonoBehaviour
 
     public void Exit()
     {
-        _state = State.Idle;
-    }
-
-    public void Click()
-    {
-        _state = _state == State.Focused ? State.Clicked : _state;
-
-        _audio_source.Play();
-
-        // Instatiate the KeyPoof Prefab where this key is located
-        // Make sure the poof animates vertically
-        Object.Instantiate(PoofReference, new Vector3(-2f, 2.5f, -12f), Quaternion.identity * Quaternion.Euler(-90f, 0f, 0f));
+        _state = _state == State.Focused ? State.Idle : _state;
     }
 
     private void Idle()
     {
-        Color color = Color.Lerp(_color_original, color_hilight, _animated_lerp);
-        _color = Color.Lerp(_color, color, lerp_idle);
+        // Return color to original state when de-focused
+        _color = _color_original;
     }
 
     public void Focused()
     {
+        // Animate color while in focused state
         Color color = Color.Lerp(_color_original, color_hilight, _animated_lerp);
         _color = Color.Lerp(_color, color, lerp_focus);
     }
 
+    public void Click()
+    {
+        _click_start_time = Time.time; // Record time of click event
+
+        _audio_source.Play();
+
+        // Instatiate the KeyPoof Prefab where the key is located
+        // Make sure the poof animates vertically
+        Object.Instantiate(PoofReference, gameObject.transform.position, Quaternion.identity * Quaternion.Euler(-90f, 0f, 0f));
+
+        // Shrink the key so that it vanishes, but isn't destroyed until the sound finishes playing
+        gameObject.transform.localScale = Vector3.one * 0f;
+
+        _state = State.Clicked;
+    }
+
     public void Clicked()
 	{
-        _color = Color.Lerp(_color, color_hilight, lerp_clicked);
+        if (Time.time > _click_start_time + 3) {
+            // Call the Unlock() method on the Door
+            DoorReference.gameObject.GetComponent<Door>().Unlock();
 
-        // Call the Unlock() method on the Door
-
-        // Destroy the key. Check the Unity documentation on how to use Destroy
-        Destroy(gameObject);
-
-        _state = _state == State.Clicked ? State.Collected : _state;
+            _state = State.Collected;
+        }
     }
 
     public void Collected()
     {
-        // Empty state for after object is destroyed
+        // Destroy key object
+        Destroy(gameObject);
     }
 }
